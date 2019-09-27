@@ -1,0 +1,89 @@
+#
+# Copyright IBM Corp All Rights Reserved
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+version: '2'
+
+networks:
+  basic:
+
+services:
+  ca0:
+    image: hyperledger/fabric-ca:1.4.1
+    environment:
+      - FABRIC_CA_SERVER_DB_TYPE=mysql
+      - FABRIC_CA_SERVER_DB_DATASOURCE=root:password@tcp(db:3306)/userdb?parseTime=true&tls=custom
+      - FABRIC_CA_SERVER_DB_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_DB_TLS_CERTFILES=/etc/hyperledger/fabric-ca-server-config/ssl/server-cert.pem
+      - FABRIC_CA_SERVER_DB_TLS_CLIENT_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ssl/client-cert.pem
+      - FABRIC_CA_SERVER_DB_TLS_CLIENT_KEYFILE=/etc/hyperledger/fabric-ca-server-config/ssl/client-key.pem
+
+    ports:
+      - 7054
+    command: sh -c 'fabric-ca-server start --ca.certfile /etc/hyperledger/fabric-ca-server-config/ca.org1.example.com.crt.pem --ca.keyfile /etc/hyperledger/fabric-ca-server-config/ca.org1.example.com.key -b admin:adminpw -d' 
+    volumes:
+      - ./ca-store/:/etc/hyperledger/fabric-ca-server-config
+      - ./ssl-store/:/etc/hyperledger/fabric-ca-server-config/ssl
+    container_name: ca0
+    networks:
+      - basic
+    # depends_on: 
+       - db
+  
+  ca1:
+    image: hyperledger/fabric-ca:1.4.1
+    environment:
+      - FABRIC_CA_SERVER_DB_TYPE=mysql
+      - FABRIC_CA_SERVER_DB_DATASOURCE=root:password@tcp(db:3306)/userdb?parseTime=true&tls=custom
+      - FABRIC_CA_SERVER_DB_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_DB_TLS_CERTFILES=/etc/hyperledger/fabric-ca-server-config/ssl/server-cert.pem
+      - FABRIC_CA_SERVER_DB_TLS_CLIENT_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ssl/client-cert.pem
+      - FABRIC_CA_SERVER_DB_TLS_CLIENT_KEYFILE=/etc/hyperledger/fabric-ca-server-config/ssl/client-key.pem
+    ports:
+      - 7054
+    command: sh -c 'fabric-ca-server start --ca.certfile /etc/hyperledger/fabric-ca-server-config/ca.org1.example.com.crt.pem --ca.keyfile /etc/hyperledger/fabric-ca-server-config/ca.org1.example.com.key -b admin:adminpw -d' 
+    volumes:
+      - ./ca-store/:/etc/hyperledger/fabric-ca-server-config
+      - ./ssl-store/:/etc/hyperledger/fabric-ca-server-config/ssl
+    container_name: ca1
+    networks:
+      - basic
+    # depends_on: 
+       - db
+
+   db:
+     image: mysql:5.7.23
+     environment:
+       - MYSQL_ROOT_PASSWORD=password
+     ports:
+       - 3306:3306
+     command: --default-authentication-plugin=mysql_native_password --sql-mode=
+     container_name: db
+     volumes:
+       - ./ssl-store/:/var/lib/mysql/
+     networks:
+       - basic
+  
+  haproxy:
+    image: haproxy:1.9.8-alpine
+    ports:
+      - 7054:7054
+    volumes:
+      - ./haproxy/:/usr/local/etc/haproxy/
+    container_name: haproxy
+    networks:
+      - basic
+    depends_on: 
+      - ca0
+      - ca1
+
+   adminer:
+     image: adminer:4.7.1-standalone
+     ports:
+       - 9000:8080
+     container_name: adminer
+     networks:
+       - basic
+     depends_on: 
+       - db
